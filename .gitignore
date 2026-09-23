@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+.venv/
+.env
+.env.*
+*.key
+*.pem
+*.db
+*.sqlite*
+options.json
+credentials.json
+sharing.json
+backups/
+logs/

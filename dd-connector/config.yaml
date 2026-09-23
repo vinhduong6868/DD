@@ -1,0 +1,21 @@
+name: DD Connector
+version: "0.3.0-beta.1"
+slug: dd_connector
+description: Connect selected Home Assistant entities to DD through VPS
+arch: [amd64, aarch64]
+startup: services
+boot: auto
+init: false
+homeassistant_api: true
+options:
+  relay_url: ""
+  shared_entities: ""
+schema:
+  relay_url: url
+  shared_entities: str
+
+ingress: true
+ingress_port: 8099
+panel_title: DD Connector
+panel_icon: mdi:lan-connect
+panel_admin: true
