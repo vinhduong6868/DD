@@ -10,6 +10,7 @@ class Profile:
     url: str
     credentials_path: Path
     fingerprint: bytes | None = None
+    lan_ip: str | None = None
 
     def tls(self):
         if self.fingerprint is None:
@@ -49,14 +50,22 @@ def profile(options, data_dir='/data'):
     pin = options.get('local_core_sha256', '').replace(':', '').lower()
     if not re.fullmatch('[a-f0-9]{64}', pin):
         raise ValueError('local_core_pin_required')
-    return Profile(mode, urlunsplit(('wss', u.netloc, '/dd-connector/local', '', '')), root / 'local-link.json', bytes.fromhex(pin))
+    override=options.get('local_core_ip','').strip()
+    if override:
+        ip=ipaddress.ip_address(override)
+        if not ip.is_private or ip.is_loopback or ip.is_unspecified or ip.is_multicast or ip.is_link_local:raise ValueError('local_core_address_invalid')
+    return Profile(mode, urlunsplit(('wss', u.netloc, '/dd-connector/local', '', '')), root / 'local-link.json', bytes.fromhex(pin), override or None)
 
 class LANResolver:
     """Resolve once through aiohttp's resolver and return only eligible LAN IPs."""
-    def __init__(self):
+    def __init__(self,host=None,lan_ip=None):
+        self.host=host;self.lan_ip=lan_ip
         from aiohttp.resolver import DefaultResolver
         self.delegate=DefaultResolver()
     async def resolve(self,host,port=0,family=0):
+        if self.lan_ip and host==self.host:
+            import socket
+            return [{'hostname':host,'host':self.lan_ip,'port':port,'family':socket.AF_INET6 if ':' in self.lan_ip else socket.AF_INET,'proto':0,'flags':0}]
         rows=await self.delegate.resolve(host,port,family)
         if not rows:raise OSError('local_core_dns_empty')
         for row in rows:

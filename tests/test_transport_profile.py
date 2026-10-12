@@ -21,3 +21,16 @@ class Tests(unittest.TestCase):
     def test_no_automatic_fallback(self):
         with self.assertRaises(ValueError):
             profile({'transport': 'auto', 'relay_url': 'wss://example.com'})
+
+class OverrideTests(unittest.IsolatedAsyncioTestCase):
+    async def test_lan_override_preserves_hostname_and_tls_pin(self):
+        from transport_profile import LANResolver
+        p=profile({'transport':'local','local_core_url':'https://core.example.com:11507','local_core_sha256':'ab'*32,'local_core_ip':'192.168.68.63'})
+        r=LANResolver('core.example.com',p.lan_ip)
+        try:
+            rows=await r.resolve('core.example.com',11507)
+            self.assertEqual(rows[0]['host'],'192.168.68.63');self.assertEqual(rows[0]['hostname'],'core.example.com')
+            self.assertIn('core.example.com',p.url);self.assertEqual(p.fingerprint,bytes.fromhex('ab'*32))
+        finally:await r.close()
+    async def test_public_override_denied(self):
+        with self.assertRaises(ValueError):profile({'transport':'local','local_core_url':'https://core.example.com','local_core_sha256':'ab'*32,'local_core_ip':'8.8.8.8'})

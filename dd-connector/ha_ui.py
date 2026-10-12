@@ -135,7 +135,7 @@ def create_app(sharing,session,ha,token,ingress_peer='172.30.32.2'):
         try:items=await catalog(session,ha,token,sharing)
         except Exception:raise web.HTTPServiceUnavailable(text='ha_catalog_unavailable') from None
         return web.json_response({'items':items,'revision':sharing.revision,'csrf':csrf,'mode':sharing.mode,
-            'transport':getattr(sharing,'active_transport','cloud'),'transport_config':sharing.transports.public() if hasattr(sharing,'transports') else {},
+            'transport':sharing.transports.options.get('transport','cloud') if hasattr(sharing,'transports') else getattr(sharing,'active_transport','cloud'),'transport_config':sharing.transports.public() if hasattr(sharing,'transports') else {},
             'online':sharing.ws is not None and not sharing.ws.closed,'paired':sharing.paired,
             'code':sharing.code if sharing.code_expires>time.time() else '', 'expires_at':sharing.code_expires})
     async def save(request):
@@ -161,7 +161,7 @@ def create_app(sharing,session,ha,token,ingress_peer='172.30.32.2'):
         sharing.changed.set()
         return web.json_response({'ok':True})
     async def transport_status(request):
-        return web.json_response({'transport':getattr(sharing,'active_transport','cloud'),
+        return web.json_response({'transport':sharing.transports.options.get('transport','cloud') if hasattr(sharing,'transports') else getattr(sharing,'active_transport','cloud'),
             'online':sharing.ws is not None and not sharing.ws.closed,'paired':sharing.paired,
             'code':sharing.code if sharing.code_expires>time.time() else '',
             'expires_at':sharing.code_expires})

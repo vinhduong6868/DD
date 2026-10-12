@@ -178,10 +178,11 @@ async def run():
                 polling=None
                 try:
                     chosen=transports.selected()
+                    sharing.active_transport=chosen.mode
                     credentials_path=chosen.credentials_path
                     if chosen.mode=='cloud':credentials_path=Path(os.environ.get("DD_LINK_FILE",str(credentials_path)))
                     from transport_profile import LANResolver
-                    connector=aiohttp.TCPConnector(resolver=LANResolver()) if chosen.mode=='local' else aiohttp.TCPConnector()
+                    connector=aiohttp.TCPConnector(resolver=LANResolver(urlparse(chosen.url).hostname,chosen.lan_ip)) if chosen.mode=='local' else aiohttp.TCPConnector()
                     async with aiohttp.ClientSession(connector=connector) as transport_session, transport_session.ws_connect(chosen.url,ssl=chosen.tls(),heartbeat=25,max_msg_size=MAX_MESSAGE) as ws:
                         sharing.ws=ws;sharing.paired=False;sharing.active_transport=chosen.mode
                         if credentials_path.exists():
