@@ -29,7 +29,12 @@ def profile(options, data_dir='/data'):
         return Profile(mode, url, root / 'link.json')
     if mode != 'local':
         raise ValueError('transport_invalid')
-    u = urlsplit(options.get('local_core_url', ''))
+    address=options.get('local_core_url','').strip()
+    if not address:
+        direct=options.get('local_core_ip','').strip()
+        parsed=ipaddress.ip_address(direct)
+        address='https://'+('['+direct+']' if parsed.version==6 else direct)+':11507'
+    u = urlsplit(address)
     if u.scheme != 'https' or not u.hostname or u.username or u.password or u.query or u.fragment or u.path not in ('', '/'):
         raise ValueError('local_core_url_invalid')
     try:

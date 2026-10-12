@@ -34,3 +34,10 @@ class OverrideTests(unittest.IsolatedAsyncioTestCase):
         finally:await r.close()
     async def test_public_override_denied(self):
         with self.assertRaises(ValueError):profile({'transport':'local','local_core_url':'https://core.example.com','local_core_sha256':'ab'*32,'local_core_ip':'8.8.8.8'})
+
+class DirectIPTests(unittest.TestCase):
+ def test_ip_only(self):
+  p=profile({'transport':'local','local_core_ip':'192.168.68.63','local_core_sha256':'ab'*32})
+  self.assertEqual(p.url,'wss://192.168.68.63:11507/dd-connector/local')
+ def test_ip_only_public_denied(self):
+  with self.assertRaises(ValueError):profile({'transport':'local','local_core_ip':'8.8.8.8','local_core_sha256':'ab'*32})
