@@ -1,7 +1,7 @@
 name: DD Connector
-version: "0.3.0-beta.1"
+version: "0.4.0-beta.1"
 slug: dd_connector
-description: Connect selected Home Assistant entities to DD through VPS
+description: Connect selected Home Assistant entities to DD Cloud or a local physical Core
 arch: [amd64, aarch64]
 startup: services
 boot: auto
@@ -10,9 +10,15 @@ homeassistant_api: true
 options:
   relay_url: ""
   shared_entities: ""
+  transport: cloud
+  local_core_url: ""
+  local_core_sha256: ""
 schema:
   relay_url: url
   shared_entities: str
+  transport: list(cloud|local)
+  local_core_url: str
+  local_core_sha256: str
 
 ingress: true
 ingress_port: 8099

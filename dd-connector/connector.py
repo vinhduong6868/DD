@@ -38,8 +38,6 @@ STATE_ATTRIBUTES = {
 def settings():
     relay = os.environ["DD_RELAY_URL"]
     ha = os.environ.get("HA_URL", "http://supervisor/core")
-    if urlparse(relay).scheme != "wss":
-        raise ValueError("DD_RELAY_URL must use wss")
     if urlparse(ha).scheme not in {"http", "https"}:
         raise ValueError("HA_URL must use http or https")
     token = os.environ.get("HA_TOKEN") or os.environ.get("SUPERVISOR_TOKEN")
@@ -115,24 +113,29 @@ async def run():
     from aiohttp import web
     from ha_ui import Sharing, create_app, ha_ws
     relay, ha, token = settings()
-    credentials_path = Path(os.environ.get("DD_LINK_FILE", "/data/link.json"))
+    from transport_store import TransportStore
+    transports = TransportStore(os.environ.get("DD_TRANSPORT_FILE", "/data/transport.json"),
+        dict(transport=os.environ.get("DD_TRANSPORT","cloud"),relay_url=relay,
+             local_core_url=os.environ.get("DD_LOCAL_CORE_URL",""),local_core_sha256=os.environ.get("DD_LOCAL_CORE_SHA256","")))
     sharing = Sharing(os.environ.get("DD_SELECTION_FILE", "/data/shared_entities.json"),
         {x.strip() for x in os.environ.get("DD_SHARED_ENTITIES", "").split(",") if x.strip()})
-    ssl_context = ssl.create_default_context()
+    sharing.transports = transports
     async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30)) as session:
         runner=web.AppRunner(create_app(sharing,session,ha,token),access_log=None)
         await runner.setup()
         await web.TCPSite(runner,'0.0.0.0',8099).start()
         async def snapshots(ws):
             import hashlib
-            previous=None;previous_selection=None;platforms={};registry_at=0
+            previous=None;previous_selection=None;platforms={};registry_at=0;registry=[];devices=[];areas=[]
             while not ws.closed:
+                if sharing.active_transport=='local':await ws.send_json({'type':'heartbeat'})
                 sharing.changed.clear()
                 config_revision=sharing.revision
                 states=None
                 if time.monotonic()-registry_at>60:
                     try:
-                        entries,=await ha_ws(session,ha,token,['config/entity_registry/list'])
+                        entries,devices,areas=await ha_ws(session,ha,token,['config/entity_registry/list','config/device_registry/list','config/area_registry/list'])
+                        registry=entries
                         platforms={e['entity_id']:e.get('platform') for e in entries if isinstance(e,dict) and isinstance(e.get('entity_id'),str)}
                     except Exception:
                         platforms={}
@@ -155,8 +158,18 @@ async def run():
                     for item in snapshot:
                         platform=platforms.get(item['entity_id'])
                         if isinstance(platform,str) and len(platform)<=80:item['platform']=platform
-                    if (revision,snapshot)!=previous:
-                        await ws.send_json({'type':'snapshot','entities':snapshot,'selection_revision':revision})
+                    if (revision,snapshot)!=previous or sharing.active_transport=='local':
+                        frame={'type':'snapshot','entities':snapshot,'selection_revision':revision}
+                        if sharing.active_transport=='local':
+                            entity_fields={'entity_id','device_id','area_id','name','original_name','platform','entity_category','disabled_by','hidden_by','device_class','state_class'}
+                            entity_rows=[{k:v for k,v in e.items() if k in entity_fields and (v is None or isinstance(v,(str,bool)))} for e in registry if isinstance(e,dict) and e.get('entity_id') in selected]
+                            device_ids={e.get('device_id') for e in entity_rows};area_ids={e.get('area_id') for e in entity_rows}
+                            device_fields={'id','name','name_by_user','manufacturer','model','area_id','disabled_by','serial_number','sw_version','hw_version'}
+                            device_rows=[{k:v for k,v in d.items() if k in device_fields and (v is None or isinstance(v,(str,bool)))} for d in devices if isinstance(d,dict) and d.get('id') in device_ids]
+                            area_ids.update(d.get('area_id') for d in device_rows)
+                            frame['catalog']={'entities':entity_rows,'devices':device_rows,'areas':[{k:a[k] for k in ('area_id','name') if k in a and isinstance(a[k],str)} for a in areas if isinstance(a,dict) and a.get('area_id') in area_ids]}
+                        if len(json.dumps(frame).encode())>MAX_MESSAGE:raise RuntimeError('snapshot_requires_pagination')
+                        await ws.send_json(frame)
                         previous=(revision,snapshot)
                 try:await asyncio.wait_for(sharing.changed.wait(),timeout=5)
                 except asyncio.TimeoutError:pass
@@ -164,8 +177,13 @@ async def run():
             while True:
                 polling=None
                 try:
-                    async with session.ws_connect(relay,ssl=ssl_context,heartbeat=25,max_msg_size=MAX_MESSAGE) as ws:
-                        sharing.ws=ws;sharing.paired=False
+                    chosen=transports.selected()
+                    credentials_path=chosen.credentials_path
+                    if chosen.mode=='cloud':credentials_path=Path(os.environ.get("DD_LINK_FILE",str(credentials_path)))
+                    from transport_profile import LANResolver
+                    connector=aiohttp.TCPConnector(resolver=LANResolver()) if chosen.mode=='local' else aiohttp.TCPConnector()
+                    async with aiohttp.ClientSession(connector=connector) as transport_session, transport_session.ws_connect(chosen.url,ssl=chosen.tls(),heartbeat=25,max_msg_size=MAX_MESSAGE) as ws:
+                        sharing.ws=ws;sharing.paired=False;sharing.active_transport=chosen.mode
                         if credentials_path.exists():
                             credentials=json.loads(credentials_path.read_text())
                             await ws.send_json({'type':'hello','link_id':credentials['link_id'],'link_secret':credentials['link_secret'],'endpoint_type':'ha','protocol':1})
@@ -201,7 +219,7 @@ async def run():
                             await ws.send_json(receipt)
                             sharing.command_log.record(command.get('id'),'receipt_sent')
                             sharing.changed.set()
-                except (aiohttp.ClientError,asyncio.TimeoutError,RuntimeError) as exc:
+                except (aiohttp.ClientError,asyncio.TimeoutError,RuntimeError,ValueError) as exc:
                     LOG.warning('Relay unavailable: %s',type(exc).__name__)
                 finally:
                     sharing.ws=None;sharing.paired=False

@@ -135,6 +135,7 @@ def create_app(sharing,session,ha,token,ingress_peer='172.30.32.2'):
         try:items=await catalog(session,ha,token,sharing)
         except Exception:raise web.HTTPServiceUnavailable(text='ha_catalog_unavailable') from None
         return web.json_response({'items':items,'revision':sharing.revision,'csrf':csrf,'mode':sharing.mode,
+            'transport':getattr(sharing,'active_transport','cloud'),'transport_config':sharing.transports.public() if hasattr(sharing,'transports') else {},
             'online':sharing.ws is not None and not sharing.ws.closed,'paired':sharing.paired,
             'code':sharing.code if sharing.code_expires>time.time() else '', 'expires_at':sharing.code_expires})
     async def save(request):
@@ -152,5 +153,19 @@ def create_app(sharing,session,ha,token,ingress_peer='172.30.32.2'):
     app.router.add_get('/api/commands',command_log)
     async def pair(request):return web.json_response(await sharing.pair())
     app.router.add_get('/',index);app.router.add_get('/api/entities',listing)
+    async def transport(request):
+        if not hasattr(sharing,'transports'):raise web.HTTPServiceUnavailable(text='transport_unavailable')
+        try:sharing.transports.save(await request.json())
+        except (ValueError,TypeError):raise web.HTTPBadRequest(text='transport_config_invalid') from None
+        if sharing.ws is not None:await sharing.ws.close()
+        sharing.changed.set()
+        return web.json_response({'ok':True})
+    async def transport_status(request):
+        return web.json_response({'transport':getattr(sharing,'active_transport','cloud'),
+            'online':sharing.ws is not None and not sharing.ws.closed,'paired':sharing.paired,
+            'code':sharing.code if sharing.code_expires>time.time() else '',
+            'expires_at':sharing.code_expires})
+    app.router.add_get('/api/transport',transport_status)
+    app.router.add_post('/api/transport',transport)
     app.router.add_post('/api/selection',save);app.router.add_post('/api/pair',pair)
     return app

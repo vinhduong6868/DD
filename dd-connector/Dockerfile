@@ -8,3 +8,5 @@ COPY index.html /app/index.html
 CMD ["python", "/app/run.py"]
 
 COPY command_log.py command_execution.py /app/
+
+COPY transport_profile.py transport_store.py /app/

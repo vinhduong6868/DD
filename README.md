@@ -39,3 +39,18 @@ Không phải mọi thiết bị đều báo trạng thái tức thì. Chỉ đ�
 ## Báo lỗi
 
 Gửi phiên bản, mã lệnh, thời gian và mã lỗi trong nhật ký. Không gửi token, mã ghép còn hiệu lực, file options/credentials hoặc dữ liệu riêng của nhà.
+
+## Kết nối với Core trong mạng nội bộ (0.4.0-beta.1)
+
+Yêu cầu Core vật lý đã có runtime DD Connector local và Home Assistant cùng mạng nội bộ. DD Cloud vẫn dùng cấu hình và thông tin ghép hiện tại.
+
+1. Trên Core: Thiết bị → Home Assistant → Thêm Home Assistant → Local · DD Connector. Copy địa chỉ Core và mã xác minh chứng chỉ từ Core đã đăng nhập.
+2. Trong DD Connector: Kết nối với DD trong mạng nội bộ. Dán địa chỉ và mã xác minh, rồi bật kết nối nội bộ.
+3. Nhập mã kết nối do Connector hiển thị vào Core. Quyền ghép được kiểm tra bằng quyền quản lý nhà hiện có.
+4. Chọn các entity muốn chia sẻ trong Connector rồi Đồng bộ trên Core. Chọn “Đồng bộ tất cả” sẽ chia sẻ toàn bộ danh sách theo chính sách hiện có.
+
+Chỉ một transport hoạt động tại một thời điểm. Ghép local và Cloud lưu thông tin riêng; không tự chuyển sang Cloud khi LAN lỗi. Cấu hình local giữ qua restart. Không cung cấp HA token cho Core. Core kiểm tra nguồn canonical trước khi đọc hoặc gửi lệnh.
+
+Local dùng TLS và đối chiếu SHA-256 chứng chỉ Core; địa chỉ phải phân giải về mạng riêng. Khi chứng chỉ Core thay đổi, cần cập nhật mã xác minh từ Core. Kết nối API key trên Core vẫn được giữ; bản này không tự chuyển hoặc gộp các nguồn. Khi dùng nhiều nguồn cho cùng Home Assistant, kiểm tra nguồn của từng thiết bị trước khi điều khiển.
+
+Bản beta đã kiểm thử bằng dữ liệu giả; nghiệm thu LAN và thiết bị thực tế còn cần hoàn tất trên cặp Core/Home Assistant. Phản hồi “accepted_unverified” chỉ cho biết HA nhận yêu cầu, không khẳng định thiết bị vật lý đã đổi trạng thái.
