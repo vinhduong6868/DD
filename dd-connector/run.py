@@ -2,6 +2,13 @@ import json
 import os
 import runpy
 
+from private_data import migrate_private_data
+migrate_private_data()
+os.environ["DD_DATA_DIR"] = "/config"
+os.environ["DD_TRANSPORT_FILE"] = "/config/transport.json"
+os.environ["DD_SELECTION_FILE"] = "/config/shared_entities.json"
+os.environ["DD_LINK_FILE"] = "/config/link.json"
+
 with open("/data/options.json", encoding="utf-8") as file:
     options = json.load(file)
 os.environ["DD_RELAY_URL"] = options.get("relay_url", "")

@@ -1,3 +1,9 @@
+# 2.0.1
+
+- Persist private Connector state in Supervisor's app-specific config volume.
+- Preserve existing Local, Cloud and sharing state when migrating from the local app to the repository app.
+- Do not copy Supervisor tokens, Home Assistant tokens or options into the migration directory.
+
 # 2.0.0
 
 - Local pairing credentials are isolated per pinned Core certificate.
