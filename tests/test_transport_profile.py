@@ -10,7 +10,7 @@ class Tests(unittest.TestCase):
     def test_local_separate_credentials(self):
         p = profile({'transport': 'local', 'local_core_url': 'https://192.168.68.63:11507', 'local_core_sha256': 'ab' * 32})
         self.assertEqual(p.url, 'wss://192.168.68.63:11507/dd-connector/local')
-        self.assertEqual(p.credentials_path.name, 'local-link.json')
+        self.assertEqual(p.credentials_path.name, 'local-link-' + 'ab'*32 + '.json')
     def test_tls_pin_required(self):
         with self.assertRaises(ValueError):
             profile({'transport': 'local', 'local_core_url': 'https://192.168.1.2'})

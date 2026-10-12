@@ -117,6 +117,9 @@ async def run():
     transports = TransportStore(os.environ.get("DD_TRANSPORT_FILE", "/data/transport.json"),
         dict(transport=os.environ.get("DD_TRANSPORT","cloud"),relay_url=relay,
              local_core_url=os.environ.get("DD_LOCAL_CORE_URL",""),local_core_sha256=os.environ.get("DD_LOCAL_CORE_SHA256","")))
+    from credential_store import migrate_legacy, read_credentials, write_credentials
+    if transports.options.get("transport") == "local":
+        migrate_legacy(transports.selected())
     sharing = Sharing(os.environ.get("DD_SELECTION_FILE", "/data/shared_entities.json"),
         {x.strip() for x in os.environ.get("DD_SHARED_ENTITIES", "").split(",") if x.strip()})
     sharing.transports = transports
@@ -185,8 +188,10 @@ async def run():
                     connector=aiohttp.TCPConnector(resolver=LANResolver(urlparse(chosen.url).hostname,chosen.lan_ip)) if chosen.mode=='local' else aiohttp.TCPConnector()
                     async with aiohttp.ClientSession(connector=connector) as transport_session, transport_session.ws_connect(chosen.url,ssl=chosen.tls(),heartbeat=25,max_msg_size=MAX_MESSAGE) as ws:
                         sharing.ws=ws;sharing.paired=False;sharing.active_transport=chosen.mode
-                        if credentials_path.exists():
-                            credentials=json.loads(credentials_path.read_text())
+                        from dataclasses import replace
+                        credential_profile=replace(chosen,credentials_path=credentials_path)
+                        credentials=read_credentials(credential_profile)
+                        if credentials is not None:
                             await ws.send_json({'type':'hello','link_id':credentials['link_id'],'link_secret':credentials['link_secret'],'endpoint_type':'ha','protocol':1})
                         else:
                             code=secrets.token_hex(6).upper();sharing.advertised(code)
@@ -195,16 +200,7 @@ async def run():
                         if hello.get('type')=='pending':hello=await ws.receive_json(timeout=300)
                         if hello.get('type')!='ready':raise RuntimeError('relay rejected pairing')
                         if 'link_secret' in hello:
-                            credentials_path.parent.mkdir(parents=True,exist_ok=True)
-                            import tempfile
-                            fd,tmp=tempfile.mkstemp(prefix='.link-',dir=credentials_path.parent)
-                            try:
-                                with os.fdopen(fd,'w') as file:
-                                    json.dump({'link_id':hello['link_id'],'link_secret':hello['link_secret']},file)
-                                    file.flush();os.fsync(file.fileno())
-                                os.replace(tmp,credentials_path)
-                            finally:
-                                if os.path.exists(tmp):os.unlink(tmp)
+                            write_credentials(credential_profile,hello)
                         sharing.paired=True;sharing.code='';sharing.code_expires=0
                         LOG.info('Connected to DD relay')
                         polling=asyncio.create_task(snapshots(ws))

@@ -54,3 +54,12 @@ Chỉ một transport hoạt động tại một thời điểm. Ghép local và
 Local dùng TLS và đối chiếu SHA-256 chứng chỉ Core; địa chỉ phải phân giải về mạng riêng. Khi chứng chỉ Core thay đổi, cần cập nhật mã xác minh từ Core. Kết nối API key trên Core vẫn được giữ; bản này không tự chuyển hoặc gộp các nguồn. Khi dùng nhiều nguồn cho cùng Home Assistant, kiểm tra nguồn của từng thiết bị trước khi điều khiển.
 
 Bản beta đã kiểm thử bằng dữ liệu giả; nghiệm thu LAN và thiết bị thực tế còn cần hoàn tất trên cặp Core/Home Assistant. Phản hồi “accepted_unverified” chỉ cho biết HA nhận yêu cầu, không khẳng định thiết bị vật lý đã đổi trạng thái.
+
+
+## DD Connector 2.0 — cập nhật
+
+Cài DD Connector từ kho `https://github.com/vinhduong6868/DD` trong Home Assistant → Cài đặt → Apps. Trong trang thông tin DD Connector, bật **Auto update / Tự động cập nhật**. Home Assistant Supervisor kiểm tra phiên bản `config.yaml` và cập nhật ứng dụng; Connector không cần quyền quản trị Supervisor để tự thay mã.
+
+Bản cài local (`local_dd_connector`) không theo dõi phiên bản GitHub. Để chuyển sang bản kho, cần sao lưu, dừng bản local, chuyển dữ liệu và các tùy chọn sang bản kho trước khi khởi chạy. Chỉ chạy một bản Connector. Dữ liệu gồm lựa chọn chia sẻ, cấu hình transport và thông tin ghép, phải chuyển nội bộ với quyền chỉ chủ sở hữu đọc; không đưa dữ liệu này lên GitHub hay log. Giữ bản local và bản sao lưu để phục hồi nếu kiểm tra kết nối chưa đạt.
+
+Bản 2.0 chuyển thông tin ghép Local cũ một lần sang kho ràng buộc chứng chỉ Core đang cấu hình lúc khởi động. Đổi IP/tên miền mà giữ đúng chứng chỉ không mất ghép. Core có mã xác minh khác phải ghép riêng; thông tin ghép Core cũ không gửi sang Core mới. Đổi chứng chỉ Core cũng cần ghép lại. Tắt nguồn, kiểm tra ảnh hưởng và kết nối lại vẫn dùng cơ chế quản lý nguồn của Core.

@@ -59,7 +59,7 @@ def profile(options, data_dir='/data'):
     if override:
         ip=ipaddress.ip_address(override)
         if not ip.is_private or ip.is_loopback or ip.is_unspecified or ip.is_multicast or ip.is_link_local:raise ValueError('local_core_address_invalid')
-    return Profile(mode, urlunsplit(('wss', u.netloc, '/dd-connector/local', '', '')), root / 'local-link.json', bytes.fromhex(pin), override or None)
+    return Profile(mode, urlunsplit(('wss', u.netloc, '/dd-connector/local', '', '')), root / ('local-link-' + pin + '.json'), bytes.fromhex(pin), override or None)
 
 class LANResolver:
     """Resolve once through aiohttp's resolver and return only eligible LAN IPs."""
